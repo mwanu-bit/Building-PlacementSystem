@@ -35,17 +35,17 @@ local BuildModelsData = {
         ID = 82808060712703;
         PlacementType = "Ground" 
     };
-    
+
     ["DefaultPart"] = {
         ID = 108065504504500;
         PlacementType = "Any"
     };
-    
+
     ["Chair"] = {
         ID = 94073954725613;
         PlacementType = "Ground"
     };
-    
+
     ["House"] = {
         ID = 124600264363488;
         PlacementType = "Ground"
@@ -95,20 +95,20 @@ end
 --Class Creation
 function BuildingHandler.new(Build,PlacementType:string)
     local self = setmetatable({},BuildingHandler)
-    
+
     self._trove = Trove.new() -- We use this trove to clean up the whole object and any of its connections and parts attached to it such as a model if the model/part is destroyed
-    self.Build = self._trove:Add(Build:Clone())
-  
-    self.isBuilding = false
-    self.canPlace = false
-    
+    self.Build = self._trove:Add(Build:Clone()) -- We attach a model to the trove
+
+    self.isBuilding = false -- This is used to ensure that the player can only build one model at a time
+    self.canPlace = false -- This dictates if the player can place the model/part
+
     self.HitInstance = nil
     self._ghostTrove = self._trove:Add(Trove.new()) -- We create a trove for cleaning up ghost builds/models which are used to show where the player will place the current build/Model they are trying to create
- 
-    self.PlacementType = PlacementType
-    self.RotationAngle = 0
+
+    self.PlacementType = PlacementType -- We store the model/parts specific placement type
+    self.RotationAngle = 0 -- We store the current Z-axis rotation angle the player switched too
     return self
-    
+
 end
 
 --This function is called when the player click a button for a build/model and wants to possobly start building it
@@ -117,13 +117,13 @@ function BuildingHandler:On_Build()
     if self.isBuilding then
         return
     end  
-    
+
     -- the destroy mode was previously on we turn it off
     if DestroyModeOn then
         DestroyModeOn = false
         DestroyModeTrove:Clean()          
     end
-    
+
     CurrentBuildObject = self
     self.isBuilding = true
 
@@ -136,7 +136,7 @@ function BuildingHandler:On_Build()
             Part.Transparency = 0.45
         end
     end
-    
+
     self._ghostBuild.Parent = workspace:WaitForChild("GhostBuilds")
 
     --We create a hitbox to cover the whole area of the part/model in order to detect if the player is trying to place the part/model inside other builds, hence preventing that
@@ -145,13 +145,13 @@ function BuildingHandler:On_Build()
     self._hitBox.CanCollide = false
 
     self._hitBox.CFrame = cFrame
-  
+
     self._hitBox.Size = Size
     self._hitBox.Transparency = 0.8
-    
+
     self._hitBox.Anchored = true
     self._hitBox.Parent = workspace:WaitForChild("HitBoxes")
-    
+
     --raycast Params
     local RayCastParams = RaycastParams.new()
     RayCastParams.FilterType = Enum.RaycastFilterType.Exclude
@@ -162,33 +162,35 @@ function BuildingHandler:On_Build()
         --Theray fires from the players screen position to thier mouse position/their last touch position
         local MouseRay = Camera:ScreenPointToRay(Mouse.X,Mouse.Y)   
         local Direction = MouseRay.Direction * 500
-        
+
         local Origin = MouseRay.Origin
         local RayResult = workspace:Raycast(Origin,Direction,RayCastParams)
-        
+
         if RayResult then
             self.HitInstance = RayResult.Instance
             local HitPosition = RayResult.Position
-           
+
             local halfHeight = self._hitBox.Size.Y/2
             local finalPosition = HitPosition + Vector3.new(0,halfHeight,0) -- we add half height so that the ghostmodel/part is placed above the instance hit
 
             local rotationCF = CFrame.Angles(0,math.rad(self.RotationAngle),0)
             local FinalCFrame = CFrame.new(finalPosition) * rotationCF
-            
-            
+
+
             self._ghostBuild:PivotTo(FinalCFrame)
             self._hitBox.CFrame = FinalCFrame
 
         end
-        
+
         self:_handleHitbox()
     end)
     
+    --We bind the action for placing the build
     local function PlaceBuild(actionName,InputState,InputObject)
         self:Place_Build(actionName,InputState,InputObject)
     end
     
+    --We bind the action for rotating the build
     local function RotateBuild(actionName,InputState,InputObject)
         self:Rotate_Build(actionName,InputState,InputObject)
     end
@@ -198,7 +200,7 @@ function BuildingHandler:On_Build()
 
     --We also bind another action which is the key press R to rotate the Model 90 degrees on The Z axis so to give the player alot more control on how they are going to be placing the buil/model
     ContextActionService:BindAction("Rotate",RotateBuild,false,Enum.KeyCode.R)
-  
+
 end
 
 --Functions rotates the current Build object on the Z axis by 90 degress so to give the player a lot more control on how they want theier "build" to look like
@@ -206,7 +208,7 @@ function BuildingHandler:Rotate_Build(actionName,InputState,InputObject)
     if actionName ~= "Rotate" or InputState ~= Enum.UserInputState.Begin then
         return
     end
-    
+
     self.RotationAngle += 90
 end
 
@@ -215,7 +217,7 @@ function BuildingHandler:_handleHitbox()
     if not self._hitBox or not self.HitInstance  then
         return
     end
-    
+
     local PartParams = OverlapParams.new()
     PartParams.MaxParts = 50
     PartParams.FilterType = Enum.RaycastFilterType.Exclude
@@ -228,28 +230,28 @@ function BuildingHandler:_handleHitbox()
         self.canPlace = false
         return
     end
-   
+
     --We also get the  "placementType" of what the model the phit box is within to also check if the player can place the current build/part on that specific placement type
     local HitInstancePlacementType = nil
     if self.HitInstance.Name == "Hitbox" and self.HitInstance.Parent:IsA("Model") then
         HitInstancePlacementType = self.HitInstance.Parent:GetAttribute("PlacementType")
-        
+
     else
         local HitInstance = self.HitInstance
         HitInstance = GetModel(HitInstance)
-        
+
         local Hitbox = HitInstance:FindFirstChild("Hitbox")
         if Hitbox then
             HitInstancePlacementType = Hitbox.Parent:GetAttribute("PlacementType")
         end
-        
+
     end
 
     --Fall back if none is found we just do "Any"
     if not HitInstancePlacementType then
         HitInstancePlacementType = "Any"
     end
-    
+
     self.HitInstancePlacementType = HitInstancePlacementType
 
     --We change the hitbox's colour based on the factors above such as placementype and what the hitbox is over lapping with to give actual visual feed back to the player to whether they can place the model/part
@@ -264,7 +266,7 @@ function BuildingHandler:_handleHitbox()
     --if they can place it the hotbox's colour is set to green
     self._hitBox.Color = Color3.new(0.333333, 1, 0)
     self.canPlace = true
-    
+
 end
 
 --Function handles placing the current build/model and calling a clean up function to the ghost trove of that model/part to avoid any memory leaks
@@ -273,20 +275,20 @@ function BuildingHandler:Place_Build(actionName,InputState,InputObject)
     if InputState ~= Enum.UserInputState.Begin then
         return
     end
-    
+
     if not self.canPlace  or not InputObject or not self.HitInstance then
         return
     end
-    
+
     self.canPlace = false
-    
+
     local PlacementType = nil
     if self.HitInstancePlacementType ~= "Any" then
         PlacementType = self.HitInstancePlacementType
     else
         PlacementType = self.PlacementType
     end
-    
+
     --If a surface was tagged "ground" and the part you place is tagged "any" then the parts  placement type will change to ground
     --We do this to ensure certain parts/models can't be stacked onto one another
     local Build = self._ghostBuild:Clone()
@@ -298,13 +300,13 @@ function BuildingHandler:Place_Build(actionName,InputState,InputObject)
             Part.Transparency = 0
         end
     end
-    
+
     Build.Parent = workspace
 
     --We clone a new hitbox for the model,part placed and parent it to that specific model/part so if to detect what models/parts in the game the player can actually destroy
     local HitBoxClone = self._hitBox:Clone()    
     HitBoxClone.Transparency = 1
-   
+
     HitBoxClone.Name = "Hitbox"
     HitBoxClone.Parent = Build
 end
@@ -319,20 +321,20 @@ function BuildingHandler:Finish_Build()
     --We reset all the variables in the object
     self.isBuilding = false  
     self.canPlace = false
-    
+
     self._ghostTrove:Clean()  
     self.HitInstance = nil
 
     --We unbind the actions 
     ContextActionService:UnbindAction("Build")
     ContextActionService:UnbindAction("Rotate")
-    
+
     CurrentBuildObject = nil
 end 
 
 --Function is used to destroy a model and its object completely
 function BuildingHandler:Destroy()
-    self._trove:Destroy
+    self._trove:Destroy()
 end    
 
 --function is called when turning off the detsroy mode to disconnect all connectons and unbind certain actions set
@@ -344,7 +346,7 @@ function BuildingHandler.Cleanup_DestroyMode()
     DestroyModeOn = false   -- We set the destroy mode back to false
     --We do clean ups to prevent memory leaks
     ContextActionService:UnbindAction("DestroyInstance")
-    
+
     InstanceToDestroy = nil
     DestroyModeTrove:Clean()
 end
@@ -356,20 +358,20 @@ function BuildingHandler._SetUpUi()
     local function SetUpBuildObject(Model:Model,PlacementType)
         local BuildObject = BuildingHandler.new(Model,PlacementType)
         BuildObjects[Model.Name] = BuildObject
-        
+
         return BuildObject
     end
-    
+
     --Function detsroy the hitinstance if the destroyaction is bound
     local function DestroyInstance(actionName,InputState,InputObject)
         if InputState ~= Enum.UserInputState.Begin or actionName ~= "DestroyInstance" then
             return
         end
-        
+
         if not InstanceToDestroy then
             return
         end
-        
+
         InstanceToDestroy:Destroy()
     end
 
@@ -379,13 +381,14 @@ function BuildingHandler._SetUpUi()
         if not Model then
             continue
         end
-        
-        
+
+        --We create a scope for the new button
         local Scope = {
             New = Fusion.New,
             Value = Fusion.Value
         }
         
+        --Using fusion we create the new image button
         local Button = Scope:New "ImageButton" {
             Name = ModelName,
             Image = "rbxassetid://".. ModelInfo.ID,
@@ -405,9 +408,9 @@ function BuildingHandler._SetUpUi()
             local BuildObject
             if BuildObjects[ModelName] then
                 BuildObject = BuildObjects[ModelName]
-            
+
             else
-                    --we create one just in case none exists
+                --we create one just in case none exists
                 BuildObject = SetUpBuildObject(Model,ModelInfo.PlacementType)
             end
 
@@ -425,14 +428,14 @@ function BuildingHandler._SetUpUi()
             --We start building if all the checks passed
             BuildObject:On_Build(ModelName)
         end)
-        
+
     end
 
     --We set up the logic of the detsroy button this includes activating/deactivating it and also showing a red selection box around the model/partw e are going to detsroy but only if
     --the model/part had a htbox suggesting that the player placed it so players can't detroy one anotehrs models/parts
     DestroyButton.Activated:Connect(function()
 
-            --If a build obejct is currently runningw e stop it
+        --If a build obejct is currently runningw e stop it
         if CurrentBuildObject then
             CurrentBuildObject:Finish_Build()
         end
@@ -446,10 +449,10 @@ function BuildingHandler._SetUpUi()
             -- if the selection box doesn't exist we create one and add it to the detsroy mode trove for future clean up
             SelectionBox = DestroyModeTrove:Add(Instance.new("SelectionBox"))
             SelectionBox.Color3 = Color3.new(1, 0, 0)
-            
+
             SelectionBox.Parent = MainGui
         end
-        
+
         DestroyModeOn = true    
         --We conect a renderstepped connection to constantly shoot out a ray form the player camera to their current mouse/touch position to get if anything that the player built previously was hit to add a selcion box to it
         DestroyModeTrove:Connect(RunService.RenderStepped,function(dt)
@@ -460,44 +463,45 @@ function BuildingHandler._SetUpUi()
             local Origin = MouseRay.Origin
             local RayResult = workspace:Raycast(Origin,Direction)
             
+            --If nothing is hit we remove the selection box and set the instance to ddestroy to nil
             if not RayResult then
                 InstanceToDestroy = nil
                 SelectionBox.Adornee = nil
                 return
             end
-            
+
             local HitInstance = RayResult.Instance
             local HitboxInstance = nil
             
+            --We try to get the main parent Model of the Hit instance and in it we cehck if a hitbox exists this ensures tht the instance to destroy was a model that the player placed
             local Model = GetModel(HitInstance)
-          
+
             local Hitbox = Model:FindFirstChild("Hitbox")         
             if Hitbox then
                 HitboxInstance = Hitbox
             end
-           
+
             --If not hitbox instance was hit then remove selection box
             if not HitboxInstance then
                 InstanceToDestroy = nil
                 SelectionBox.Adornee = nil
                 return
             end
-            
+
             InstanceToDestroy = Model      
             SelectionBox.Adornee = Model
         end)
-        
+
         -- We bind the input for destroying
         ContextActionService:BindAction("DestroyInstance",DestroyInstance,false,Enum.UserInputType.Touch,Enum.UserInputType.MouseButton1)
-       
+
     end)
 end
-    
+
 --Initializes the module    
 function BuildingHandler.Init()
+    --We call the fucntion to set up the ui
     BuildingHandler._SetUpUi()
-    
 end
 
 return BuildingHandler
-
