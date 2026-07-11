@@ -1,3 +1,4 @@
+--Connected Discord to Github : DiscordUser :FancyXice : RobloxUser :FancyXice
 --Desc:Script handles a building system similar to the one in games such as Work At a Pizza Place
 --The system handles teh following features: Core Building Logic such as Placement of Build,Rotation of Builds to be Placed and Destruction of Placed Builds
 --The system is a combination of what would have been two scripts a handler and class scripts
